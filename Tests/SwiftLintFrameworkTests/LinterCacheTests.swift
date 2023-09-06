@@ -53,6 +53,13 @@ private struct CacheTestHelper {
 }
 
 private class TestFileManager: LintableFileManager {
+	func subPaths(
+		inPath path: String,
+		rootDirectory: String? = nil
+	) -> AnySequence<(path: String, isFile: Bool, skipDescendants: () -> Void)> {
+		return AnySequence([])
+	}
+
     fileprivate func filesToLint(inPath: String, rootDirectory: String? = nil) -> [String] {
         return []
     }

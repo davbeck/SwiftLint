@@ -243,14 +243,21 @@ extension Configuration {
 
             queuedPrintError("\(visitor.action) Swift files \(filesInfo)")
         }
+        
         return visitor.paths.flatMap {
-            self.lintableFiles(
+            self.lintablePathsV2(
                 inPath: $0,
-                forceExclude: visitor.forceExclude,
-                excludeBy: visitor.useExcludingByPrefix
-                    ? .prefix
-                    : .paths(excludedPaths: excludedPaths()))
+                forceExclude: visitor.forceExclude
+            )
         }
+//        return visitor.paths.flatMap {
+//            self.lintableFiles(
+//                inPath: $0,
+//                forceExclude: visitor.forceExclude,
+//                excludeBy: visitor.useExcludingByPrefix
+//                    ? .prefix
+//                    : .paths(excludedPaths: excludedPaths()))
+//        }
     }
 
     func visitLintableFiles(options: LintOrAnalyzeOptions, cache: LinterCache? = nil, storage: RuleStorage,

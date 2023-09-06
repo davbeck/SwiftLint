@@ -2,6 +2,12 @@ import Foundation
 
 /// An interface for enumerating files that can be linted by SwiftLint.
 public protocol LintableFileManager {
+	/// Returns all files in a given path, with the option to skip descendants of directories.
+    func subPaths(
+		inPath path: String,
+		rootDirectory: String?
+	) -> AnySequence<(path: String, isFile: Bool, skipDescendants: () -> Void)>
+
     /// Returns all files that can be linted in the specified path. If the path is relative, it will be appended to the
     /// specified root path, or currentt working directory if no root directory is specified.
     ///
@@ -29,6 +35,36 @@ public protocol LintableFileManager {
 }
 
 extension FileManager: LintableFileManager {
+    public func subPaths(
+        inPath path: String,
+        rootDirectory: String? = nil
+    ) -> AnySequence<(path: String, isFile: Bool, skipDescendants: () -> Void)> {
+        let absolutePath = path.bridge()
+            .absolutePathRepresentation(rootDirectory: rootDirectory ?? currentDirectoryPath).bridge()
+            .standardizingPath
+
+        // if path is a file, it won't be returned in `enumerator(atPath:)`
+        if absolutePath.bridge().isSwiftFile() && absolutePath.isFile {
+            return AnySequence {
+                AnyIterator {
+                    (absolutePath, true, {})
+                }
+            }
+        }
+
+        return AnySequence<(path: String, isFile: Bool, skipDescendants: () -> Void)> {
+            let enumerator = FileManager.default.enumerator(atPath: absolutePath)
+
+            return AnyIterator<(path: String, isFile: Bool, skipDescendants: () -> Void)> {
+                guard let enumerator, let subPath = enumerator.nextObject() as? String else { return nil }
+
+                let isFile = enumerator.fileAttributes?[FileAttributeKey.type] as? FileAttributeType == .typeRegular
+
+                return (subPath, isFile, enumerator.skipDescendants)
+            }
+        }
+    }
+
     public func filesToLint(inPath path: String, rootDirectory: String? = nil) -> [String] {
         let absolutePath = path.bridge()
             .absolutePathRepresentation(rootDirectory: rootDirectory ?? currentDirectoryPath).bridge()

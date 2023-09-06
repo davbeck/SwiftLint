@@ -228,6 +228,19 @@ class ConfigurationTests: SwiftLintTestCase {
     }
 
     private class TestFileManager: LintableFileManager {
+		func subPaths(inPath path: String, rootDirectory: String?) -> AnySequence<(path: String, isFile: Bool, skipDescendants: () -> Void)> {
+			var filesToLint: [String] = []
+			switch path {
+			case "directory": filesToLint = ["directory/File1.swift", "directory/File2.swift",
+											 "directory/excluded/Excluded.swift",
+											 "directory/ExcludedFile.swift"]
+			case "directory/excluded": filesToLint = ["directory/excluded/Excluded.swift"]
+			case "directory/ExcludedFile.swift": filesToLint = ["directory/ExcludedFile.swift"]
+			default: XCTFail("Should not be called with path \(path)")
+			}
+			return AnySequence(filesToLint.absolutePathsStandardized().map { ($0, true, {}) })
+		}
+
         func filesToLint(inPath path: String, rootDirectory: String? = nil) -> [String] {
             var filesToLint: [String] = []
             switch path {
@@ -490,6 +503,18 @@ extension ConfigurationTests {
         let configuration = Configuration(
             includedPaths: ["Level1"],
             excludedPaths: ["Level1/*/*.swift", "Level1/*/*/*.swift"])
+        let paths = configuration.lintablePaths(inPath: "Level1",
+                                                forceExclude: false,
+                                                excludeBy: .prefix)
+        let filenames = paths.map { $0.bridge().lastPathComponent }.sorted()
+        XCTAssertEqual(filenames, ["Level1.swift"])
+    }
+
+    func testExcludeByGlobstarExcludePaths() {
+        FileManager.default.changeCurrentDirectoryPath(Mock.Dir.level0)
+        let configuration = Configuration(
+            includedPaths: ["Level1"],
+			excludedPaths: ["**/Level2.swift", "**/Level3.swift"])
         let paths = configuration.lintablePaths(inPath: "Level1",
                                                 forceExclude: false,
                                                 excludeBy: .prefix)

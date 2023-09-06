@@ -21,6 +21,62 @@ extension Configuration {
         return lintablePaths(inPath: path, forceExclude: forceExclude, excludeBy: excludeBy)
             .compactMap(SwiftLintFile.init(pathDeferringReading:))
     }
+    
+    public func lintablePathsV2(
+        inPath path: String,
+        forceExclude: Bool
+    ) -> [SwiftLintFile] {
+        lintablePathsV2(inPath: path, forceExclude: forceExclude)
+            .compactMap(SwiftLintFile.init(pathDeferringReading:))
+    }
+    
+    internal func lintablePathsV2(
+        inPath path: String,
+        forceExclude: Bool,
+        fileManager: LintableFileManager = FileManager.default
+    ) -> [String] {
+        // TODO: handle single file paths
+//        if fileManager.isFile(atPath: path) {
+//            if forceExclude {
+//                switch excludeBy {
+//                case .prefix:
+//                    return filterExcludedPathsByPrefix(in: [path.absolutePathStandardized()])
+//                case .paths(let excludedPaths):
+//                    return filterExcludedPaths(excludedPaths, in: [path.absolutePathStandardized()])
+//                }
+//            }
+//            // If path is a file and we're not forcing excludes, skip filtering with excluded/included paths
+//            return [path]
+//        }
+        
+        let includedPatterns = try! includedPaths.map { try Glob.convertGlob($0) }
+        let excludedPatterns = try! excludedPaths.map { try Glob.convertGlob($0) }
+        let absolutePath = path.bridge()
+            .absolutePathRepresentation(rootDirectory: FileManager.default.currentDirectoryPath).bridge()
+            .standardizingPath
+        
+        var paths: [String] = []
+        
+        for subPath in fileManager.subPaths(inPath: path, rootDirectory: nil) {
+            var isIncluded: Bool {
+                includedPatterns.isEmpty || includedPatterns.contains(where: { $0.hasMatch(in: subPath.path) })
+            }
+            var isExcluded: Bool {
+                excludedPatterns.contains(where: { $0.hasMatch(in: subPath.path) })
+            }
+            
+            if !isIncluded || isExcluded {
+                subPath.skipDescendants()
+                continue
+            }
+            
+            guard subPath.isFile, subPath.path.isSwiftFile() else { continue }
+            
+            paths.append(absolutePath.bridge().appendingPathComponent(subPath.path))
+        }
+        
+        return paths
+    }
 
     /// Returns the paths for files that can be linted by SwiftLint in the specified parent path.
     ///
